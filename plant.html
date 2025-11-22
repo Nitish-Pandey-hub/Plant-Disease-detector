@@ -1,0 +1,289 @@
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Advanced Plant Disease Detector</title>
+
+<!-- JSPDF Library for PDF Creation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+/* -------------------------------------------------------
+   EVERYTHING YOU ALREADY HAD + NEW FEATURES
+-------------------------------------------------------- */
+
+/* Animated Blue→Green Background */
+body {
+    margin: 0;
+    font-family: Poppins, sans-serif;
+    background: linear-gradient(-45deg, #003973, #00bf8f, #023859, #009f6b);
+    background-size: 400% 400%;
+    animation: bgAnim 15s ease infinite;
+    color: #e6e6e6;
+}
+@keyframes bgAnim {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+header {
+    text-align: center;
+    padding: 30px 10px;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 0 25px rgba(0,0,0,0.4);
+}
+h1 { color: #a7ffdf; }
+
+/* Container */
+.container {
+    max-width: 750px;
+    margin: 60px auto;
+    background: rgba(255,255,255,0.10);
+    padding: 35px;
+    border-radius: 18px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 0 30px rgba(0,0,0,0.3);
+}
+
+/* Upload Box */
+.upload-box {
+    border: 3px dashed #a7ffdf;
+    padding: 60px 20px;
+    text-align: center;
+    border-radius: 15px;
+    cursor: pointer;
+    font-size: 22px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 30px;
+    transition: 0.25s;
+    box-shadow: 0 0 20px rgba(167,255,223,0.5);
+}
+.upload-box:hover {
+    transform: scale(1.03);
+    box-shadow: 0 0 35px rgba(167,255,223,0.9);
+}
+input[type="file"] { display: none; }
+
+/* Preview */
+.preview { text-align: center; }
+img {
+    max-width: 90%;
+    margin-top: 15px;
+    border-radius: 10px;
+    box-shadow: 0 0 18px rgba(0,0,0,0.5);
+}
+
+/* Analyze Button */
+button {
+    width: 100%;
+    padding: 14px;
+    margin-top: 25px;
+    color: #003f38;
+    font-size: 18px;
+    background: #a7ffdf;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+}
+button:hover { background: #7ff7c8; }
+
+/* Loading Spinner */
+.spinner {
+    border: 5px solid rgba(255,255,255,0.2);
+    border-top: 5px solid #a7ffdf;
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* Result Box */
+#result {
+    display: none;
+    margin-top: 20px;
+    padding: 15px;
+    background: rgba(0,0,0,0.4);
+    border-left: 5px solid #a7ffdf;
+    border-radius: 8px;
+}
+
+/* Probability Bars */
+.prob-bar {
+    background: rgba(255,255,255,0.15);
+    border-radius: 6px;
+    margin: 10px 0;
+    height: 20px;
+    overflow: hidden;
+}
+.prob-fill {
+    height: 100%;
+    color: #000;
+    font-size: 12px;
+    font-weight: bold;
+    padding-left: 5px;
+}
+
+/* PDF Button */
+#pdfBtn {
+    display: none;
+    background: #ffea7f;
+    color: #4a3f00;
+    margin-top: 15px;
+}
+
+</style>
+</head>
+<body>
+
+<header>
+    <h1>🌿 Advanced Plant Disease Detector</h1>
+    <p>AI + Color Analysis + PDF Reports</p>
+</header>
+
+<div class="container">
+
+    <!-- Upload -->
+    <label class="upload-box" for="imageUpload">📤 Upload Leaf Image</label>
+    <input type="file" id="imageUpload" accept="image/*">
+    <div class="preview" id="preview"></div>
+
+    <div class="loading" id="loading" style="text-align:center; display:none;">
+        <div class="spinner"></div>
+        <p>Analyzing leaf...</p>
+    </div>
+
+    <button onclick="detectDisease()">Detect Disease</button>
+
+    <!-- Results -->
+    <div id="result"></div>
+
+    <!-- PDF Button -->
+    <button id="pdfBtn" onclick="downloadPDF()">📄 Download Report (PDF)</button>
+
+</div>
+
+
+<script>
+let uploadedImage;
+
+// Handle image upload
+document.getElementById("imageUpload").onchange = (e) => {
+    uploadedImage = e.target.files[0];
+    document.getElementById("preview").innerHTML =
+        `<img id="leafImage" src="${URL.createObjectURL(uploadedImage)}">`;
+};
+
+// Main Analysis
+async function detectDisease() {
+    if (!uploadedImage) {
+        alert("Upload an image first!");
+        return;
+    }
+
+    document.getElementById("loading").style.display = "block";
+    setTimeout(analyzeImage, 600);
+}
+
+function analyzeImage() {
+    const img = document.getElementById("leafImage");
+
+    // Canvas
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
+
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+    let total = pixels.length / 4;
+    let green = 0, yellow = 0, brown = 0, white = 0;
+
+    for (let i = 0; i < pixels.length; i += 4) {
+        let r = pixels[i], g = pixels[i+1], b = pixels[i+2];
+
+        if (g > r + 20 && g > b + 20) green++;
+        if (r > 150 && g > 150 && b < 80) yellow++;
+        if (r > 100 && g < 80 && b < 60) brown++;
+        if (r > 200 && g > 200 && b > 200) white++;
+    }
+
+    // Percentages
+    let prob = {
+        healthy: (green/total*100),
+        deficiency: (yellow/total*100),
+        rust: (brown/total*100),
+        mildew: (white/total*100),
+    };
+
+    let finalDiagnosis = "";
+    if (prob.mildew > 5) finalDiagnosis = "⚪ Powdery Mildew";
+    else if (prob.rust > 5) finalDiagnosis = "🟤 Rust / Blight";
+    else if (prob.deficiency > 10) finalDiagnosis = "🟡 Nutrient Deficiency";
+    else if (prob.healthy > 60) finalDiagnosis = "🌱 Healthy Leaf";
+    else finalDiagnosis = "⚠️ Abnormal Leaf";
+
+    // Show results
+    document.getElementById("loading").style.display = "none";
+
+    let html = `<h3>📊 Disease Probability Analysis</h3>`;
+
+    function bar(label, percent, color) {
+        return `
+            <p>${label}: ${percent.toFixed(1)}%</p>
+            <div class="prob-bar">
+                <div class="prob-fill" style="width:${percent}%; background:${color};">
+                </div>
+            </div>
+        `;
+    }
+
+    html += bar("Healthy", prob.healthy, "#7dffbc");
+    html += bar("Nutrient Deficiency", prob.deficiency, "#ffe97d");
+    html += bar("Rust / Blight", prob.rust, "#ff9b63");
+    html += bar("Powdery Mildew", prob.mildew, "#ffffff");
+
+    html += `<h3>Final Diagnosis:</h3><p><b>${finalDiagnosis}</b></p>`;
+
+    document.getElementById("result").innerHTML = html;
+    document.getElementById("result").style.display = "block";
+
+    // Show PDF button
+    document.getElementById("pdfBtn").style.display = "block";
+
+    window.diagnosis = finalDiagnosis;
+    window.prob = prob;
+}
+
+// PDF Generator
+function downloadPDF() {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF();
+
+    pdf.setFontSize(18);
+    pdf.text("Plant Disease Detection Report", 20, 20);
+
+    pdf.setFontSize(12);
+    pdf.text(`Date: ${new Date().toLocaleString()}`, 20, 30);
+    pdf.text(`Diagnosis: ${window.diagnosis}`, 20, 40);
+
+    pdf.text("Probabilities:", 20, 55);
+    pdf.text(`Healthy: ${window.prob.healthy.toFixed(1)}%`, 20, 65);
+    pdf.text(`Nutrient Deficiency: ${window.prob.deficiency.toFixed(1)}%`, 20, 75);
+    pdf.text(`Rust / Blight: ${window.prob.rust.toFixed(1)}%`, 20, 85);
+    pdf.text(`Powdery Mildew: ${window.prob.mildew.toFixed(1)}%`, 20, 95);
+
+    pdf.save("Leaf_Diagnosis_Report.pdf");
+}
+
+</script>
+
+</body>
+</html>
